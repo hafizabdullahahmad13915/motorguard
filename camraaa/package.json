@@ -1,0 +1,10 @@
+{
+  "name": "motorguard-ui-system",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node backend/server.js"
+  },
+  "dependencies": {
+    "mongoose": "^9.8.0"
+  }
+}

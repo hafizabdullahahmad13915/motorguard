@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MotorGuard — NHMP Automated Speed Enforcement Platform</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   MOTORGUARD DESIGN TOKENS
+   ============================================================ */
+:root{
+  --bg:#080D16;
+  --card:#0F1626;
+  --border:rgba(30,41,59,0.5);
+  --border-solid:#1E293B;
+  --warn:#F0A83C;
+  --crit:#E4483F;
+  --success:#35D6A0;
+  --accent:#4F8FE8;
+  --text:#F8FAFC;
+  --muted:#94A3B8;
+  --r-card:10px;
+  --r-btn:8px;
+  --r-badge:6px;
+  --r-plate:4px;
+  --f-ui:'IBM Plex Sans',sans-serif;
+  --f-mono:'IBM Plex Mono',monospace;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{background:#03060b; color:var(--text); font-family:var(--f-ui); -webkit-font-smoothing:antialiased;}
+::-webkit-scrollbar{width:8px; height:8px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border-solid); border-radius:4px;}
+
+/* ============================================================
+   META CHROME (prototype navigation — not part of the product)
+   ============================================================ */
+.meta-header{
+  position:sticky; top:0; z-index:500;
+  background:rgba(8,13,22,0.92); backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border-solid);
+  display:flex; align-items:center; gap:24px;
+  padding:14px 28px;
+}
+.meta-brand{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:0.5px; font-size:15px;}
+.meta-brand .dot{width:9px; height:9px; border-radius:50%; background:var(--accent); box-shadow:0 0 10px var(--accent); animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.35;}}
+.meta-tabs{display:flex; gap:6px; flex:1; flex-wrap:wrap;}
+.meta-tab{
+  font-family:var(--f-mono); font-size:11px; letter-spacing:0.5px; text-transform:uppercase;
+  color:var(--muted); background:transparent; border:1px solid var(--border-solid);
+  padding:8px 14px; border-radius:var(--r-btn); cursor:pointer; transition:all .15s;
+  display:flex; flex-direction:column; align-items:flex-start; gap:2px;
+}
+.meta-tab span.role-num{color:var(--accent); font-size:9px;}
+.meta-tab:hover{border-color:var(--accent); color:var(--text);}
+.meta-tab.active{background:var(--card); border-color:var(--accent); color:var(--text); box-shadow:0 0 0 1px var(--accent) inset;}
+.meta-dims{font-family:var(--f-mono); font-size:10px; color:var(--muted); white-space:nowrap;}
+
+.stage-wrap{padding:40px 20px 80px; display:flex; justify-content:center; gap:36px; flex-wrap:wrap; align-items:flex-start;}
+.stage-label{
+  text-align:center; font-family:var(--f-mono); font-size:11px; color:var(--muted);
+  margin-bottom:14px; text-transform:uppercase; letter-spacing:1.5px;
+}
+.stage-label b{color:var(--accent);}
+.device-frame{
+  border:1px solid var(--border-solid); border-radius:16px; overflow:hidden;
+  box-shadow:0 40px 100px -20px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.02);
+  background:var(--bg);
+}
+.role-screen{display:none;}
+.role-screen.active{display:flex; justify-content:center; flex-wrap:wrap; gap:36px;}
+.stage-col{display:flex; flex-direction:column; align-items:center;}
+
+/* ============================================================
+   SHARED ATOMS
+   ============================================================ */
+.badge{
+  display:inline-flex; align-items:center; gap:5px; font-family:var(--f-mono); font-size:10px;
+  font-weight:600; padding:3px 8px; border-radius:var(--r-badge); text-transform:uppercase; letter-spacing:0.4px;
+}
+.badge.compliant{background:rgba(53,214,160,0.12); color:var(--success); border:1px solid rgba(53,214,160,0.3);}
+.badge.speeding{background:rgba(240,168,60,0.12); color:var(--warn); border:1px solid rgba(240,168,60,0.3);}
+.badge.severe{background:rgba(228,72,63,0.12); color:var(--crit); border:1px solid rgba(228,72,63,0.3);}
+.badge.settled{background:rgba(79,143,232,0.12); color:var(--accent); border:1px solid rgba(79,143,232,0.3);}
+.badge .b-dot{width:5px; height:5px; border-radius:50%; background:currentColor;}
+.card{background:var(--card); border:1px solid var(--border); border-radius:var(--r-card);}
+.btn{
+  font-family:var(--f-ui); font-weight:600; font-size:13px; border-radius:var(--r-btn);
+  border:1px solid var(--border-solid); background:var(--card); color:var(--text);
+  padding:9px 16px; cursor:pointer; transition:all .15s;
+}
+.btn:hover{border-color:var(--accent); color:var(--accent);}
+.btn.primary{background:var(--accent); color:#030a16; border-color:var(--accent);}
+.btn.primary:hover{opacity:0.88; color:#030a16;}
+.btn.success{background:var(--success); color:#04231a; border-color:var(--success);}
+.btn.danger{background:var(--crit); color:#2a0a08; border-color:var(--crit);}
+.mono{font-family:var(--f-mono);}
+.muted{color:var(--muted);}
+.eyebrow{font-family:var(--f-mono); font-size:10px; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted);}
+.live-dot{width:8px; height:8px; border-radius:50%; background:var(--crit); box-shadow:0 0 8px var(--crit); position:relative; flex-shrink:0;}
+.live-dot::after{content:''; position:absolute; inset:-4px; border-radius:50%; border:1.5px solid var(--crit); animation:livepulse 1.6s infinite;}
+.live-dot.blue{background:var(--accent); box-shadow:0 0 8px var(--accent);}
+.live-dot.blue::after{border-color:var(--accent);}
+@keyframes livepulse{0%{opacity:0.9; transform:scale(0.6);}100%{opacity:0; transform:scale(2.2);}}
+
+/* License plate chip — Pakistani plate style */
+.plate-chip{
+  display:inline-flex; flex-direction:column; align-items:center; background:#F8FAFC; border-radius:var(--r-plate);
+  overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,0.4); border:1px solid #ccd3db;
+}
+.plate-chip .strip{width:100%; height:5px; background:linear-gradient(90deg, #0F7A3D 50%, #1E5FA8 50%);}
+.plate-chip .txt{padding:5px 10px; font-family:var(--f-mono); font-weight:700; color:#0a0a0a; font-size:13px; letter-spacing:0.5px;}
+
+/* Radar / grid background */
+.radar-bg{
+  background-image:
+    linear-gradient(rgba(79,143,232,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(79,143,232,0.045) 1px, transparent 1px);
+  background-size:28px 28px;
+}
+
+/* ============================================================
+   ROLE 1 — CONTROL ROOM (1920x1080)
+   ============================================================ */
+.occ{width:1920px; height:1080px; display:grid; grid-template-columns:220px 1fr 360px; grid-template-rows:76px 1fr 230px; background:var(--bg); font-size:14px;}
+.occ-topnav{grid-column:1/4; grid-row:1; display:flex; align-items:center; padding:0 24px; border-bottom:1px solid var(--border-solid); gap:28px; background:linear-gradient(180deg, rgba(15,22,38,0.6), transparent);}
+.occ-logo{display:flex; align-items:center; gap:10px; font-weight:700; font-size:17px; letter-spacing:0.3px;}
+.occ-logo .mark{width:10px; height:10px; border-radius:3px; background:var(--accent); box-shadow:0 0 14px var(--accent);}
+.occ-kpis{display:flex; gap:12px; flex:1;}
+.kpi{flex:1; max-width:220px; padding:9px 15px; border-radius:var(--r-card); background:var(--card); border:1px solid var(--border); display:flex; flex-direction:column; gap:2px;}
+.kpi .kv{font-family:var(--f-mono); font-size:19px; font-weight:600;}
+.kpi .kl{font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px;}
+.kpi.warn .kv{color:var(--warn);}
+.kpi.good .kv{color:var(--success);}
+.kpi.crit .kv{color:var(--crit);}
+.occ-clock{font-family:var(--f-mono); font-size:13px; color:var(--muted); text-align:right;}
+
+.occ-sidenav{grid-column:1; grid-row:2/4; border-right:1px solid var(--border-solid); padding:18px 10px; display:flex; flex-direction:column; gap:4px;}
+.nav-item{display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:var(--r-btn); font-size:13px; font-weight:500; color:var(--muted); cursor:pointer;}
+.nav-item .ic{width:16px; height:16px; border-radius:3px; border:1.5px solid currentColor; flex-shrink:0;}
+.nav-item.active{background:rgba(79,143,232,0.08); color:var(--accent); border:1px solid rgba(79,143,232,0.25);}
+.nav-item:not(.active):hover{color:var(--text); background:rgba(255,255,255,0.03);}
+
+.occ-map{grid-column:2; grid-row:2; position:relative; border-right:1px solid var(--border-solid); overflow:hidden;}
+.occ-map .panel-title{position:absolute; top:16px; left:20px; z-index:2;}
+.occ-map .panel-title .t{font-weight:600; font-size:14px;}
+.occ-map svg{width:100%; height:100%;}
+
+.occ-side{grid-column:3; grid-row:2; display:flex; flex-direction:column;}
+.side-head{padding:16px 18px 10px; border-bottom:1px solid var(--border-solid); display:flex; align-items:center; gap:8px;}
+.side-head .t{font-weight:600; font-size:14px;}
+.side-head .s{font-size:11px; color:var(--muted); margin-top:2px;}
+.anpr-feed{flex:1; overflow-y:auto; padding:14px;}
+.anpr-card{border-radius:var(--r-card); background:rgba(255,255,255,0.015); border:1px solid var(--border); margin-bottom:12px; overflow:hidden;}
+.anpr-snap{height:110px; background:linear-gradient(135deg, #10182b, #0a0f1a); position:relative; display:flex; align-items:center; justify-content:center;}
+.anpr-snap .car-silhouette{width:120px; height:52px; background:#1c2a44; border-radius:10px 10px 4px 4px; position:relative;}
+.anpr-snap .car-silhouette::before{content:''; position:absolute; top:-18px; left:20px; right:20px; height:20px; background:#1c2a44; border-radius:8px 8px 0 0;}
+.anpr-snap .cam-tag{position:absolute; top:8px; left:10px; font-family:var(--f-mono); font-size:9px; color:var(--crit); display:flex; align-items:center; gap:4px;}
+.anpr-body{padding:12px 14px;}
+.anpr-row1{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+.anpr-speed{text-align:right;}
+.anpr-speed .v{font-family:var(--f-mono); font-size:20px; font-weight:700;}
+.anpr-speed .l{font-size:9px; color:var(--muted); text-transform:uppercase;}
+.anpr-meta{display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-top:8px;}
+
+.occ-table-wrap{grid-column:1/4; grid-row:3; border-top:1px solid var(--border-solid); padding:14px 24px; overflow:hidden; display:flex; flex-direction:column;}
+.table-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+table.variance{width:100%; border-collapse:collapse; font-size:12.5px;}
+table.variance thead th{text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:0.6px; color:var(--muted); font-weight:600; padding:6px 12px; border-bottom:1px solid var(--border-solid);}
+table.variance tbody td{padding:8px 12px; border-bottom:1px solid var(--border); font-family:var(--f-mono); vertical-align:middle;}
+table.variance tbody tr:hover{background:rgba(255,255,255,0.02);}
+
+/* ============================================================
+   ROLE 2 — TOLL OPERATOR (1024x768)
+   ============================================================ */
+.toll{width:1024px; height:768px; display:flex; flex-direction:column; background:var(--bg); font-size:14px;}
+.toll-head{display:flex; align-items:center; justify-content:space-between; padding:16px 24px; border-bottom:1px solid var(--border-solid);}
+.toll-title{display:flex; align-items:center; gap:12px; font-weight:700; font-size:16px;}
+.toll-lane{font-family:var(--f-mono); font-size:12px; color:var(--muted);}
+.toll-body{flex:1; display:grid; grid-template-columns:1fr 1fr; gap:20px; padding:20px 24px; overflow:hidden;}
+.toll-snap{border-radius:14px; overflow:hidden; border:1px solid var(--border-solid); background:linear-gradient(135deg, #10182b, #0a0f1a); position:relative; height:280px; display:flex; align-items:center; justify-content:center;}
+.toll-snap .car-silhouette{width:220px; height:96px; background:#1c2a44; border-radius:18px 18px 8px 8px; position:relative;}
+.toll-snap .car-silhouette::before{content:''; position:absolute; top:-30px; left:36px; right:36px; height:34px; background:#1c2a44; border-radius:14px 14px 0 0;}
+.toll-snap .plate-overlay{position:absolute; bottom:16px; left:50%; transform:translateX(-50%);}
+.toll-plateread{margin-top:14px; display:flex; align-items:center; justify-content:center; gap:10px;}
+.status-panel{border-radius:16px; padding:26px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:10px; transition:all .2s;}
+.status-panel.go{background:rgba(53,214,160,0.1); border:2px solid var(--success);}
+.status-panel.stop{background:rgba(228,72,63,0.1); border:2px solid var(--crit);}
+.status-panel .icon{font-size:46px;}
+.status-panel .headline{font-weight:700; font-size:20px;}
+.status-panel.go .headline{color:var(--success);}
+.status-panel.stop .headline{color:var(--crit);}
+.status-panel .amount{font-family:var(--f-mono); font-size:36px; font-weight:700; color:var(--crit); margin-top:4px;}
+.toll-toggle{display:flex; gap:8px; margin-top:14px;}
+.toll-toggle button{flex:1;}
+
+.violation-detail{grid-column:1/3; padding:16px 18px;}
+.vd-row{display:flex; gap:20px; align-items:center;}
+.vd-proof{flex:1;}
+.vd-proof .line{display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); font-size:12.5px;}
+.vd-proof .line:last-child{border-bottom:none;}
+.vd-actions{display:grid; grid-template-columns:1fr 1fr; gap:10px; width:420px;}
+.vd-actions button{padding:14px 10px; font-size:12.5px;}
+
+/* ============================================================
+   ROLE 3 & 4 — MOBILE FRAME BASE (393x852)
+   ============================================================ */
+.mobile{width:393px; height:852px; background:var(--bg); display:flex; flex-direction:column; position:relative; overflow:hidden;}
+.m-statusbar{height:44px; display:flex; align-items:center; justify-content:space-between; padding:0 22px; font-family:var(--f-mono); font-size:12px; color:var(--text); flex-shrink:0;}
+.m-header{padding:6px 20px 14px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;}
+.m-header .t{font-size:19px; font-weight:700;}
+.m-tabs{display:flex; gap:0; padding:0 20px 14px; border-bottom:1px solid var(--border-solid); flex-shrink:0;}
+.m-tab{flex:1; text-align:center; padding:8px 0; font-size:11.5px; font-weight:600; color:var(--muted); cursor:pointer; border-bottom:2px solid transparent;}
+.m-tab.active{color:var(--accent); border-bottom-color:var(--accent);}
+.m-body{flex:1; overflow-y:auto; padding:16px 20px 30px;}
+.m-navbar{flex-shrink:0; height:78px; background:rgba(15,22,38,0.92); backdrop-filter:blur(14px); border-top:1px solid var(--border-solid); display:flex; align-items:center; padding-bottom:14px;}
+.m-nav-item{flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; color:var(--muted); font-size:9.5px; font-weight:600;}
+.m-nav-item .ic{width:20px; height:20px; border-radius:5px; border:1.6px solid currentColor;}
+.m-nav-item.active{color:var(--accent);}
+
+/* Driver Portal specifics */
+.profile-card{display:flex; align-items:center; gap:14px; margin-bottom:20px;}
+.avatar{width:54px; height:54px; border-radius:50%; background:var(--card); border:1px solid var(--border-solid); display:flex; align-items:center; justify-content:center; font-size:20px;}
+.cnic{font-family:var(--f-mono); font-size:11.5px; color:var(--muted); margin-top:2px;}
+.challan-card{border-radius:16px; padding:20px; position:relative; overflow:hidden; background:linear-gradient(135deg, #1c1010 0%, #150a0a 60%, #0F1626 100%); border:1px solid rgba(228,72,63,0.35); margin-bottom:18px;}
+.challan-card::after{content:''; position:absolute; width:200px; height:200px; border-radius:50%; background:radial-gradient(circle, rgba(228,72,63,0.18), transparent 70%); top:-80px; right:-60px;}
+.challan-top{display:flex; justify-content:space-between; align-items:flex-start; position:relative; z-index:1;}
+.challan-amt{font-family:var(--f-mono); font-size:32px; font-weight:700; color:var(--crit); margin-top:10px; position:relative; z-index:1;}
+.challan-meta{display:flex; justify-content:space-between; margin-top:16px; position:relative; z-index:1; font-size:11px; color:var(--muted);}
+.info-row{display:flex; justify-content:space-between; padding:11px 0; border-bottom:1px solid var(--border); font-size:13px;}
+.info-row:last-child{border-bottom:none;}
+
+.cam-compare{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;}
+.cam-box{border-radius:10px; overflow:hidden; border:1px solid var(--border-solid); background:linear-gradient(135deg,#10182b,#0a0f1a);}
+.cam-box .cam-img{height:90px; display:flex; align-items:center; justify-content:center; position:relative;}
+.cam-box .cam-label{padding:8px 10px; font-family:var(--f-mono); font-size:10px; color:var(--muted); border-top:1px solid var(--border-solid);}
+.cam-box .cam-label b{color:var(--text);}
+.math-box{background:var(--card); border:1px solid var(--border); border-radius:var(--r-card); padding:16px; margin-bottom:16px;}
+.math-line{display:flex; justify-content:space-between; padding:7px 0; font-family:var(--f-mono); font-size:12px; border-bottom:1px dashed var(--border);}
+.math-line.total{border-bottom:none; padding-top:10px; font-size:14px; font-weight:700; color:var(--crit);}
+.pay-opt{display:flex; align-items:center; gap:12px; padding:14px; border-radius:var(--r-card); border:1px solid var(--border-solid); margin-bottom:10px; cursor:pointer;}
+.pay-opt.active{border-color:var(--accent); background:rgba(79,143,232,0.06);}
+.pay-opt .pic{width:36px; height:36px; border-radius:8px; background:var(--card); display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0;}
+.receipt-card{border-radius:16px; padding:22px; background:var(--card); border:1px solid var(--border-solid); text-align:center;}
+.receipt-check{width:52px; height:52px; border-radius:50%; background:rgba(53,214,160,0.14); border:2px solid var(--success); display:flex; align-items:center; justify-content:center; font-size:24px; color:var(--success); margin:0 auto 12px;}
+
+/* Field Tech specifics */
+.cam-list-item{display:flex; align-items:center; justify-content:space-between; padding:13px; border-radius:var(--r-card); border:1px solid var(--border); background:var(--card); margin-bottom:9px;}
+.cam-list-item .name{font-weight:600; font-size:13px;}
+.cam-list-item .loc{font-size:11px; color:var(--muted); margin-top:2px;}
+.status-pill{display:inline-flex; align-items:center; gap:5px; font-family:var(--f-mono); font-size:10px; font-weight:600; padding:4px 9px; border-radius:var(--r-badge);}
+.diag-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px;}
+.diag-tile{background:var(--card); border:1px solid var(--border); border-radius:var(--r-card); padding:14px;}
+.diag-tile .v{font-family:var(--f-mono); font-size:20px; font-weight:700;}
+.diag-tile .l{font-size:10px; color:var(--muted); text-transform:uppercase; margin-top:2px;}
+.field-input{width:100%; background:var(--card); border:1px solid var(--border-solid); border-radius:var(--r-btn); padding:12px 14px; color:var(--text); font-family:var(--f-ui); font-size:13px; margin-bottom:12px;}
+.field-select{width:100%; background:var(--card); border:1px solid var(--border-solid); border-radius:var(--r-btn); padding:12px 14px; color:var(--text); font-family:var(--f-ui); font-size:13px; margin-bottom:12px; appearance:none;}
+.upload-box{border:1.5px dashed var(--border-solid); border-radius:var(--r-card); padding:24px; text-align:center; color:var(--muted); font-size:12.5px; margin-bottom:14px;}
+
+/* ============================================================
+   DESIGN SYSTEM PAGE
+   ============================================================ */
+.ds-wrap{width:1400px; padding:48px; background:var(--bg);}
+.ds-h1{font-size:30px; font-weight:700; margin-bottom:6px;}
+.ds-sub{color:var(--muted); font-size:14px; margin-bottom:40px;}
+.ds-section{margin-bottom:44px;}
+.ds-label{font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--accent); margin-bottom:16px; display:block;}
+.swatch-row{display:flex; gap:14px; flex-wrap:wrap;}
+.swatch{width:150px;}
+.swatch .box{height:80px; border-radius:var(--r-card); border:1px solid var(--border-solid); margin-bottom:8px;}
+.swatch .name{font-size:12px; font-weight:600;}
+.swatch .hex{font-family:var(--f-mono); font-size:11px; color:var(--muted);}
+.type-row{display:flex; align-items:baseline; gap:20px; padding:14px 0; border-bottom:1px solid var(--border);}
+.type-row .sample{font-weight:600;}
+.type-row .meta{font-family:var(--f-mono); font-size:11px; color:var(--muted); width:260px; flex-shrink:0;}
+.atom-grid{display:flex; gap:16px; flex-wrap:wrap; align-items:center;}
+</style>
+</head>
+<body>
+
+<div class="meta-header">
+  <div class="meta-brand"><div class="dot"></div>MOTORGUARD</div>
+  <div class="meta-tabs">
+    <button class="meta-tab active" data-target="occ" onclick="showRole('occ',this)"><span class="role-num">ROLE 01</span>Control Room</button>
+    <button class="meta-tab" data-target="toll" onclick="showRole('toll',this)"><span class="role-num">ROLE 02</span>Toll Operator</button>
+    <button class="meta-tab" data-target="driver" onclick="showRole('driver',this)"><span class="role-num">ROLE 03</span>Driver Portal</button>
+    <button class="meta-tab" data-target="field" onclick="showRole('field',this)"><span class="role-num">ROLE 04</span>Field Tech</button>
+    <button class="meta-tab" data-target="ds" onclick="showRole('ds',this)"><span class="role-num">SYSTEM</span>Design Tokens</button>
+  </div>
+  <div class="meta-dims" id="dimsLabel">1920 × 1080 · DESKTOP</div>
+</div>
+
+<div class="stage-wrap">
+
+<!-- ============================================================ ROLE 1: CONTROL ROOM ============================================================ -->
+<div class="role-screen active" id="scr-occ">
+<div class="stage-col">
+  <div class="stage-label">Role 01 — NHMP Control Room Dashboard &nbsp;<b>1920×1080 · Desktop</b></div>
+  <div class="device-frame"><div class="occ radar-bg">
+
+    <div class="occ-topnav">
+      <div class="occ-logo"><div class="mark"></div>MotorGuard</div>
+      <div class="occ-kpis">
+        <div class="kpi"><div class="kv" id="occScannedCount">142,890</div><div class="kl">Scanned Today</div></div>
+        <div class="kpi warn"><div class="kv" id="occViolationCount">1,240</div><div class="kl">Violations</div></div>
+        <div class="kpi"><div class="kv" id="occAvgSpeed">112 km/h</div><div class="kl">Avg Speed</div></div>
+        <div class="kpi good"><div class="kv" id="occSettledCount">850</div><div class="kl">Settled at Toll</div></div>
+        <div class="kpi"><div class="kv" id="occRevenue">PKR 2.13M</div><div class="kl">Revenue</div></div>
+      </div>
+      <div class="occ-clock">TUE JUL 21 2026<br><span style="color:var(--text); font-size:15px;" id="occClock">14:32:07 PKT</span></div>
+    </div>
+
+    <div class="occ-sidenav">
+      <div class="nav-item active"><div class="ic"></div>Live Monitor</div>
+      <div class="nav-item"><div class="ic"></div>Violations Log</div>
+      <div class="nav-item"><div class="ic"></div>Camera Health</div>
+      <div class="nav-item"><div class="ic"></div>Analytics</div>
+      <div class="nav-item" style="margin-top:auto;"><div class="ic"></div>Settings</div>
+    </div>
+
+    <div class="occ-map">
+      <div class="panel-title"><div class="t">M-2 Motorway — Kalar Kahar Section</div><div class="muted" style="font-size:11px;">2 ANPR sites · live tracking</div></div>
+      <svg viewBox="0 0 1360 780" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <radialGradient id="sweep" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#4F8FE8" stop-opacity="0.10"/>
+            <stop offset="100%" stop-color="#4F8FE8" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <circle cx="680" cy="390" r="380" fill="url(#sweep)"/>
+        <!-- Motorway path -->
+        <path d="M 60 500 C 300 500 380 200 620 200 S 1000 560 1300 560" fill="none" stroke="#1E293B" stroke-width="34" stroke-linecap="round"/>
+        <path d="M 60 500 C 300 500 380 200 620 200 S 1000 560 1300 560" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="10 10" stroke-linecap="round"/>
+
+        <!-- Camera nodes -->
+        <g font-family="IBM Plex Mono" font-size="12" fill="#94A3B8">
+          <g transform="translate(390,300)">
+            <circle r="16" fill="none" stroke="#4F8FE8" stroke-width="2" opacity="0.5"><animate attributeName="r" values="16;28;16" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite"/></circle>
+            <circle r="9" fill="#4F8FE8"/>
+            <rect x="-38" y="18" width="76" height="20" rx="4" fill="#0F1626" stroke="#1E293B"/>
+            <text x="-30" y="32" fill="#F8FAFC" font-weight="600">CAM-01</text>
+          </g>
+          <g transform="translate(940,410)">
+            <circle r="16" fill="none" stroke="#4F8FE8" stroke-width="2" opacity="0.5"><animate attributeName="r" values="16;28;16" dur="2s" begin="0.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.5;0;0.5" dur="2s" begin="0.5s" repeatCount="indefinite"/></circle>
+            <circle r="9" fill="#4F8FE8"/>
+            <rect x="-38" y="18" width="76" height="20" rx="4" fill="#0F1626" stroke="#1E293B"/>
+            <text x="-30" y="32" fill="#F8FAFC" font-weight="600">CAM-02</text>
+          </g>
+        </g>
+
+        <!-- vehicle markers with speed -->
+        <g font-family="IBM Plex Mono" font-size="10" font-weight="600">
+          <g transform="translate(520,232)">
+            <circle r="7" fill="#E4483F"><animate attributeName="r" values="7;9;7" dur="1.4s" repeatCount="indefinite"/></circle>
+            <rect x="-30" y="12" width="82" height="18" rx="4" fill="#0F1626" stroke="#E4483F"/>
+            <text x="-24" y="25" fill="#E4483F">138 km/h</text>
+          </g>
+          <g transform="translate(700,220)">
+            <circle r="7" fill="#35D6A0"><animate attributeName="r" values="7;9;7" dur="1.4s" repeatCount="indefinite"/></circle>
+            <rect x="-30" y="12" width="82" height="18" rx="4" fill="#0F1626" stroke="#35D6A0"/>
+            <text x="-24" y="25" fill="#35D6A0">108 km/h</text>
+          </g>
+          <g transform="translate(820,270)">
+            <circle r="7" fill="#F0A83C"><animate attributeName="r" values="7;9;7" dur="1.4s" repeatCount="indefinite"/></circle>
+            <rect x="-30" y="12" width="82" height="18" rx="4" fill="#0F1626" stroke="#F0A83C"/>
+            <text x="-24" y="25" fill="#F0A83C">124 km/h</text>
+          </g>
+          <g transform="translate(1080,510)">
+            <circle r="7" fill="#35D6A0"><animate attributeName="r" values="7;9;7" dur="1.4s" repeatCount="indefinite"/></circle>
+            <rect x="-30" y="12" width="82" height="18" rx="4" fill="#0F1626" stroke="#35D6A0"/>
+            <text x="-24" y="25" fill="#35D6A0">115 km/h</text>
+          </g>
+        </g>
+
+        <text x="60" y="540" font-family="IBM Plex Mono" font-size="12" fill="#94A3B8">← Islamabad</text>
+        <text x="1240" y="600" font-family="IBM Plex Mono" font-size="12" fill="#94A3B8">Lahore →</text>
+      </svg>
+    </div>
+
+    <div class="occ-side">
+      <div class="side-head"><div class="live-dot"></div><div><div class="t">Live ANPR Feed</div><div class="s">Cam-01 &amp; Cam-02 · real-time</div></div></div>
+      <div id="occFetchState" class="muted mono" style="padding:0 14px 10px;"></div>
+      <div class="anpr-feed" id="anprFeed"></div>
+    </div>
+
+    <div class="occ-table-wrap">
+      <div class="table-head">
+        <div style="font-weight:600; font-size:14px;">Recent Challans</div>
+        <div class="muted mono" style="font-size:11px;">Showing 6 of 1,240 records</div>
+      </div>
+      <table class="variance">
+        <thead><tr><th>Plate</th><th>Vehicle</th><th>Speed</th><th>Time Δ</th><th>Fine (PKR)</th><th>Status</th></tr></thead>
+        <tbody id="challanBody"></tbody>
+      </table>
+    </div>
+
+  </div></div>
+</div>
+</div>
+
+<!-- ============================================================ ROLE 2: TOLL OPERATOR ============================================================ -->
+<div class="role-screen" id="scr-toll">
+<div class="stage-col">
+  <div class="stage-label">Role 02 — Toll Plaza Operator View &nbsp;<b>1024×768 · Tablet</b></div>
+  <div class="device-frame"><div class="toll">
+
+    <div class="toll-head">
+      <div class="toll-title"><div class="mark" style="width:9px;height:9px;border-radius:3px;background:var(--accent);box-shadow:0 0 10px var(--accent);"></div>Kalar Kahar Toll Plaza</div>
+      <div class="toll-lane" id="tollLaneStatus">LANE 3 · OPERATOR ID: OP-0042 · 14:32:07</div>
+    </div>
+
+    <div class="toll-body">
+      <div>
+        <div class="toll-snap">
+          <div class="car-silhouette"></div>
+          <div class="plate-overlay">
+            <span class="plate-chip"><span class="strip"></span><span class="txt" id="tollPlate">PUNJAB-LEB-9981</span></span>
+          </div>
+        </div>
+        <div class="toll-plateread">
+          <span class="eyebrow">ANPR READ:</span>
+          <span class="plate-chip"><span class="strip"></span><span class="txt" id="tollReadPlate">PUNJAB-LEB-9981</span></span>
+          <span class="badge severe" id="tollConfidenceBadge"><span class="b-dot"></span>Match Confidence 98.6%</span>
+        </div>
+        <div class="toll-toggle">
+          <button class="btn" onclick="tollState('go')">Preview: Clear Vehicle</button>
+          <button class="btn" onclick="tollState('stop')">Preview: Violation Found</button>
+        </div>
+      </div>
+
+      <div class="status-panel stop" id="statusPanel">
+        <div class="icon" id="statusIcon">⛔</div>
+        <div class="headline" id="statusHeadline">PENDING E-CHALLAN FOUND</div>
+        <div class="amount" id="statusAmount">PKR 2,500</div>
+        <div class="muted" style="font-size:12px;" id="statusSub">1 unpaid violation on record · M-2 Kalar Kahar</div>
+      </div>
+      <div id="tollFetchState" class="muted mono" style="padding:10px 14px 0;"></div>
+
+      <div class="card violation-detail">
+        <div class="vd-row">
+          <div class="vd-proof">
+            <div class="eyebrow" style="margin-bottom:6px;">Speed Proof</div>
+            <div class="line"><span>Recorded speed</span><span class="mono" id="recordedSpeed" style="color:var(--crit); font-weight:700;">136 km/h</span></div>
+            <div class="line"><span>Posted limit</span><span class="mono" id="postedLimit">120 km/h</span></div>
+            <div class="line"><span>Overage</span><span class="mono" id="overage" style="color:var(--warn);">+16 km/h</span></div>
+            <div class="line"><span>Location</span><span class="mono" id="locationLine">M-2 · KM 118 · Cam-01</span></div>
+            <div class="line"><span>Date / Time</span><span class="mono" id="dateTime">18 Jul 2026 · 09:14:02</span></div>
+          </div>
+          <div class="vd-actions">
+            <button class="btn success" onclick="tollState('go')">Collect Cash / POS</button>
+            <button class="btn primary">Pay via QR / 1Bill</button>
+            <button class="btn">Send SMS Link</button>
+            <button class="btn danger">Escalate</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div></div>
+</div>
+</div>
+
+<!-- ============================================================ ROLE 3: DRIVER PORTAL ============================================================ -->
+<div class="role-screen" id="scr-driver">
+<div class="stage-col">
+  <div class="stage-label">Role 03 — Public Driver Portal &nbsp;<b>393×852 · Mobile</b></div>
+  <div class="device-frame"><div class="mobile radar-bg">
+
+    <div class="m-statusbar"><span>9:41</span><span>●●●&nbsp;&nbsp;📶&nbsp;&nbsp;🔋</span></div>
+    <div class="m-header"><div class="t">MotorGuard</div>
+      <div style="width:34px; height:34px; border-radius:50%; background:var(--card); border:1px solid var(--border-solid); display:flex; align-items:center; justify-content:center; font-size:13px;">🔔</div>
+    </div>
+    <div class="m-tabs">
+      <div class="m-tab active" onclick="driverTab(0,this)">Profile</div>
+      <div class="m-tab" onclick="driverTab(1,this)">Evidence</div>
+      <div class="m-tab" onclick="driverTab(2,this)">Pay</div>
+    </div>
+
+    <!-- Screen 1: Profile -->
+    <div class="m-body" id="dBody0">
+      <div class="profile-card">
+        <div class="avatar">👤</div>
+        <div><div id="driverName" style="font-weight:700; font-size:16px;">Ahmed Raza</div><div class="cnic" id="driverCnic">CNIC 35202-1234567-1</div></div>
+      </div>
+      <div id="driverFetchState" class="muted mono" style="padding:0 14px 10px;"></div>
+      <div class="challan-card">
+        <div class="challan-top">
+          <div><div class="eyebrow">UNPAID E-CHALLAN</div><div id="driverViolationHeadline" style="font-weight:700; font-size:14px; margin-top:4px;">Speeding Violation</div></div>
+          <span class="badge severe" id="driverSeverityBadge"><span class="b-dot"></span>Severe</span>
+        </div>
+        <div class="challan-amt" id="driverDueAmount">PKR 2,500</div>
+        <div class="challan-meta">
+          <span>Plate: <b id="driverPlate" style="color:var(--text);">PUNJAB-LEB-9981</b></span>
+          <span id="driverDueDate">Due 04 Aug 2026</span>
+        </div>
+      </div>
+
+      <div class="m-section-title" style="font-size:11px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:var(--muted); margin-bottom:10px;">Vehicle &amp; Account</div>
+      <div class="card" style="padding:4px 16px; margin-bottom:16px;">
+        <div class="info-row"><span class="muted">Registered Plate</span><span class="mono" id="driverRegisteredPlate">PUNJAB-LEB-9981</span></div>
+        <div class="info-row"><span class="muted">Vehicle</span><span id="driverVehicle">Toyota Corolla, White</span></div>
+        <div class="info-row"><span class="muted">Total Challans</span><span class="mono" id="driverChallans">1 unpaid · 4 settled</span></div>
+        <div class="info-row"><span class="muted">Account Status</span><span class="badge speeding" id="driverAccountStatus"><span class="b-dot"></span>Action Needed</span></div>
+      </div>
+      <button class="btn primary" style="width:100%; padding:14px; font-size:14px;" onclick="driverTab(1,document.querySelectorAll('.m-tab')[1])">Review Evidence →</button>
+    </div>
+
+    <!-- Screen 2: Evidence -->
+    <div class="m-body" id="dBody1" style="display:none;">
+      <div class="eyebrow" style="margin-bottom:10px;">Dual-Camera Speed Evidence</div>
+      <div class="cam-compare">
+        <div class="cam-box">
+          <div class="cam-img"><div style="width:70px;height:34px;background:#1c2a44;border-radius:8px;"></div></div>
+          <div class="cam-label">CAM A · KM 116<br><b id="driverCamA">09:14:00.000</b></div>
+        </div>
+        <div class="cam-box">
+          <div class="cam-img"><div style="width:70px;height:34px;background:#1c2a44;border-radius:8px;"></div></div>
+          <div class="cam-label">CAM B · KM 118<br><b id="driverCamB">09:14:54.545</b></div>
+        </div>
+      </div>
+
+      <div class="math-box">
+        <div class="eyebrow" style="margin-bottom:8px;">Average Speed Calculation</div>
+        <div class="math-line"><span>Distance Cam A → Cam B</span><span id="driverDistance">2.0 km</span></div>
+        <div class="math-line"><span>Time elapsed</span><span id="driverTimeElapsed">54.545 sec</span></div>
+        <div class="math-line"><span>Avg speed = 2.0 km ÷ (54.545s/3600)</span><span id="driverAvgSpeed">132 km/h</span></div>
+        <div class="math-line total"><span>Posted limit: <span id="driverPostedLimit">120 km/h</span></span><span id="driverOverage">+12 km/h over</span></div>
+      </div>
+
+      <div class="eyebrow" style="margin-bottom:8px;">Violation Photo</div>
+      <div class="toll-snap" style="height:170px; margin-bottom:16px;">
+        <div class="car-silhouette" style="width:150px;height:66px;"></div>
+        <div class="plate-overlay"><span class="plate-chip"><span class="strip"></span><span class="txt">PUNJAB-LEB-9981</span></span></div>
+      </div>
+      <button class="btn primary" style="width:100%; padding:14px; font-size:14px;" onclick="driverTab(2,document.querySelectorAll('.m-tab')[2])">Proceed to Payment →</button>
+    </div>
+
+    <!-- Screen 3: Payment -->
+    <div class="m-body" id="dBody2" style="display:none;">
+      <div class="eyebrow" style="margin-bottom:10px;">Amount Due</div>
+      <div style="font-family:var(--f-mono); font-size:30px; font-weight:700; color:var(--crit); margin-bottom:20px;">PKR 2,500</div>
+
+      <div class="eyebrow" style="margin-bottom:10px;">Choose Payment Method</div>
+      <div class="pay-opt active"><div class="pic">🧾</div><div><div style="font-weight:600; font-size:13px;">1Bill</div><div class="muted" style="font-size:11px;">Bank transfer / Easypaisa app</div></div></div>
+      <div class="pay-opt"><div class="pic">📱</div><div><div style="font-weight:600; font-size:13px;">JazzCash</div><div class="muted" style="font-size:11px;">Mobile wallet</div></div></div>
+      <div class="pay-opt"><div class="pic">💳</div><div><div style="font-weight:600; font-size:13px;">EasyPaisa</div><div class="muted" style="font-size:11px;">Mobile wallet</div></div></div>
+      <div class="pay-opt"><div class="pic">💰</div><div><div style="font-weight:600; font-size:13px;">Debit / Credit Card</div><div class="muted" style="font-size:11px;">Visa, Mastercard</div></div></div>
+
+      <button id="driverPayButton" class="btn success" style="width:100%; padding:14px; font-size:14px; margin:16px 0 22px;">Pay PKR 2,500</button>
+
+      <div class="eyebrow" style="margin-bottom:10px;">Digital Receipt Preview</div>
+      <div class="receipt-card">
+        <div class="receipt-check">✓</div>
+        <div style="font-weight:700; font-size:15px; margin-bottom:4px;">Payment Successful</div>
+        <div class="muted" style="font-size:11.5px; margin-bottom:14px;">Challan #MG-118402 · PUNJAB-LEB-9981</div>
+        <svg width="120" height="120" viewBox="0 0 150 150" style="margin:0 auto 10px; display:block;">
+          <rect width="150" height="150" fill="#0F1626" rx="10"/>
+          <g fill="#F8FAFC">
+            <rect x="14" y="14" width="30" height="30"/><rect x="106" y="14" width="30" height="30"/><rect x="14" y="106" width="30" height="30"/>
+            <rect x="22" y="22" width="14" height="14" fill="#0F1626"/><rect x="114" y="22" width="14" height="14" fill="#0F1626"/><rect x="22" y="114" width="14" height="14" fill="#0F1626"/>
+            <rect x="54" y="14" width="8" height="8"/><rect x="70" y="14" width="8" height="8"/><rect x="86" y="22" width="8" height="8"/>
+            <rect x="54" y="54" width="8" height="8"/><rect x="70" y="62" width="8" height="8"/><rect x="86" y="54" width="8" height="8"/>
+            <rect x="62" y="78" width="8" height="8"/><rect x="78" y="86" width="8" height="8"/><rect x="54" y="94" width="8" height="8"/>
+            <rect x="102" y="62" width="8" height="8"/><rect x="118" y="78" width="8" height="8"/><rect x="102" y="94" width="8" height="8"/>
+          </g>
+        </svg>
+        <div class="mono muted" style="font-size:10.5px;">Paid via 1Bill · 21 Jul 2026 14:32</div>
+      </div>
+    </div>
+
+    <div class="m-navbar">
+      <div class="m-nav-item active"><div class="ic"></div>Home</div>
+      <div class="m-nav-item"><div class="ic"></div>Challans</div>
+      <div class="m-nav-item"><div class="ic"></div>Vehicles</div>
+      <div class="m-nav-item"><div class="ic"></div>Profile</div>
+    </div>
+
+  </div></div>
+</div>
+</div>
+
+<!-- ============================================================ ROLE 4: FIELD TECH ============================================================ -->
+<div class="role-screen" id="scr-field">
+<div class="stage-col">
+  <div class="stage-label">Role 04 — Field Technician App &nbsp;<b>393×852 · Mobile</b></div>
+  <div class="device-frame"><div class="mobile radar-bg">
+
+    <div class="m-statusbar"><span>9:41</span><span>●●●&nbsp;&nbsp;📶&nbsp;&nbsp;🔋</span></div>
+    <div class="m-header"><div class="t">Field Tech</div>
+      <div style="width:34px; height:34px; border-radius:50%; background:var(--card); border:1px solid var(--border-solid); display:flex; align-items:center; justify-content:center; font-size:13px;">🎫</div>
+    </div>
+    <div class="m-tabs">
+      <div class="m-tab active" onclick="fieldTab(0,this)">Cameras</div>
+      <div class="m-tab" onclick="fieldTab(1,this)">Diagnostics</div>
+      <div class="m-tab" onclick="fieldTab(2,this)">Report Issue</div>
+    </div>
+
+    <!-- Screen 1: Camera list -->
+    <div class="m-body" id="fBody0">
+      <div class="eyebrow" style="margin-bottom:10px;">M-2 ANPR Network · 12 Sites</div>
+      <div id="camList"></div>
+    </div>
+
+    <!-- Screen 2: Diagnostics -->
+    <div class="m-body" id="fBody1" style="display:none;">
+      <div class="eyebrow" style="margin-bottom:10px;">Site Diagnostic — <span id="techCameraId">CAM-08</span></div>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:16px;">
+        <span class="plate-chip"><span class="strip"></span><span class="txt" style="font-size:11px;">M-2 KM 142</span></span>
+        <span class="status-pill" id="techStatusPill" style="background:rgba(228,72,63,0.12); color:var(--crit); border:1px solid rgba(228,72,63,0.3);">● OFFLINE</span>
+      </div>
+      <div id="techFetchState" class="muted mono" style="padding:0 14px 10px;"></div>
+      <div class="diag-grid">
+        <div class="diag-tile"><div class="v" id="techPing" style="color:var(--crit);">Timeout</div><div class="l">Ping</div></div>
+        <div class="diag-tile"><div class="v" id="techFps">0 fps</div><div class="l">Frame Rate</div></div>
+        <div class="diag-tile"><div class="v" id="techLens" style="color:var(--warn);">Dirty</div><div class="l">Lens Status</div></div>
+        <div class="diag-tile"><div class="v" id="techLastOnline">3d 4h</div><div class="l">Last Online</div></div>
+      </div>
+      <div class="card" style="padding:14px 16px; margin-bottom:16px;">
+        <div class="info-row"><span class="muted">Firmware</span><span class="mono" id="techFirmware">v4.2.1</span></div>
+        <div class="info-row"><span class="muted">Power supply</span><span class="badge compliant" id="techPowerStatus"><span class="b-dot"></span>Normal</span></div>
+        <div class="info-row"><span class="muted">Network link</span><span class="badge severe" id="techNetworkLink"><span class="b-dot"></span>Down</span></div>
+        <div class="info-row"><span class="muted">Storage</span><span class="mono" id="techStorage">82% used</span></div>
+      </div>
+      <button class="btn primary" style="width:100%; padding:14px; font-size:14px;" onclick="fieldTab(2,document.querySelectorAll('#scr-field .m-tab')[2])">Log Issue for CAM-08</button>
+    </div>
+
+    <!-- Screen 3: Issue report -->
+    <div class="m-body" id="fBody2" style="display:none;">
+      <div class="eyebrow" style="margin-bottom:12px;">New Issue Ticket</div>
+      <label class="muted" style="font-size:11px;">CAMERA</label>
+      <select id="techCameraSelect" class="field-select"><option>CAM-08 · M-2 KM 142</option><option>CAM-01 · M-2 KM 116</option><option>CAM-02 · M-2 KM 118</option></select>
+      <label class="muted" style="font-size:11px;">ISSUE TYPE</label>
+      <select id="techIssueTypeSelect" class="field-select"><option>Camera Offline / No Signal</option><option>Lens Obstruction</option><option>Calibration Drift</option><option>Housing Damage</option><option>Power Failure</option></select>
+      <label class="muted" style="font-size:11px;">DESCRIPTION</label>
+      <input id="techIssueDescInput" class="field-input" placeholder="Describe the fault observed on site...">
+      <label class="muted" style="font-size:11px;">PHOTO EVIDENCE</label>
+      <div class="upload-box">📷<br>Tap to capture or upload site photo</div>
+      <button id="techSubmitIssue" class="btn primary" style="width:100%; padding:14px; font-size:14px;">Submit Ticket</button>
+      <div class="last-bcast mono" style="font-family:var(--f-mono); font-size:10.5px; color:var(--muted); margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">LAST TICKET · CAM-05 · Resolved 19 Jul 2026<br>"Lens cleaned, recalibrated to spec"</div>
+    </div>
+
+    <div class="m-navbar">
+      <div class="m-nav-item active"><div class="ic"></div>Cameras</div>
+      <div class="m-nav-item"><div class="ic"></div>Tickets</div>
+      <div class="m-nav-item"><div class="ic"></div>Map</div>
+      <div class="m-nav-item"><div class="ic"></div>Profile</div>
+    </div>
+
+  </div></div>
+</div>
+</div>
+
+<!-- ============================================================ DESIGN SYSTEM REFERENCE ============================================================ -->
+<div class="role-screen" id="scr-ds">
+<div class="stage-col">
+  <div class="stage-label">Design System — Tokens &amp; Shared Atoms</div>
+  <div class="device-frame"><div class="ds-wrap">
+    <div class="ds-h1">MotorGuard Design System</div>
+    <div class="ds-sub">Dark "traffic control center" aesthetic — tokens shared across all four role-based interfaces.</div>
+
+    <div class="ds-section">
+      <span class="ds-label">Color Tokens</span>
+      <div class="swatch-row">
+        <div class="swatch"><div class="box" style="background:#080D16;"></div><div class="name">Base BG</div><div class="hex">#080D16</div></div>
+        <div class="swatch"><div class="box" style="background:#0F1626;"></div><div class="name">Card Surface</div><div class="hex">#0F1626</div></div>
+        <div class="swatch"><div class="box" style="background:#1E293B;"></div><div class="name">Border</div><div class="hex">#1E293B · 50%</div></div>
+        <div class="swatch"><div class="box" style="background:#F0A83C;"></div><div class="name">Warning (Speeding)</div><div class="hex">#F0A83C</div></div>
+        <div class="swatch"><div class="box" style="background:#E4483F;"></div><div class="name">Critical (Violation)</div><div class="hex">#E4483F</div></div>
+        <div class="swatch"><div class="box" style="background:#35D6A0;"></div><div class="name">Success (Compliant)</div><div class="hex">#35D6A0</div></div>
+        <div class="swatch"><div class="box" style="background:#4F8FE8;"></div><div class="name">Tech / ANPR Accent</div><div class="hex">#4F8FE8</div></div>
+        <div class="swatch"><div class="box" style="background:#F8FAFC;"></div><div class="name">Text Primary</div><div class="hex">#F8FAFC</div></div>
+        <div class="swatch"><div class="box" style="background:#94A3B8;"></div><div class="name">Text Muted</div><div class="hex">#94A3B8</div></div>
+      </div>
+    </div>
+
+    <div class="ds-section">
+      <span class="ds-label">Typography</span>
+      <div class="type-row"><span class="meta">IBM Plex Sans / 28 / 700</span><span class="sample" style="font-size:28px; font-weight:700;">NHMP Control Room</span></div>
+      <div class="type-row"><span class="meta">IBM Plex Sans / 16 / 600</span><span class="sample" style="font-size:16px; font-weight:600;">Live ANPR Feed</span></div>
+      <div class="type-row"><span class="meta">IBM Plex Sans / 13 / 400</span><span class="sample" style="font-size:13px;">Pending e-challan found for this vehicle</span></div>
+      <div class="type-row"><span class="meta">IBM Plex Mono / 22 / 700 — Speeds</span><span class="sample mono" style="font-size:22px; font-weight:700;">134 km/h</span></div>
+      <div class="type-row"><span class="meta">IBM Plex Mono / 16 / 700 — Plates</span><span class="sample mono" style="font-size:16px; font-weight:700;">ICT-LEA-1234</span></div>
+      <div class="type-row"><span class="meta">IBM Plex Mono / 13 / 500 — Timestamps</span><span class="sample mono" style="font-size:13px; font-weight:500;">18 Jul 2026 · 09:14:02</span></div>
+      <div class="type-row"><span class="meta">IBM Plex Mono / 20 / 700 — PKR Amounts</span><span class="sample mono" style="font-size:20px; font-weight:700; color:var(--crit);">PKR 2,500</span></div>
+    </div>
+
+    <div class="ds-section">
+      <span class="ds-label">Radius Scale</span>
+      <div class="atom-grid">
+        <div style="width:120px; height:70px; background:var(--card); border:1px solid var(--border-solid); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:11px;" class="mono">Card · 10px</div>
+        <div style="width:120px; height:44px; background:var(--card); border:1px solid var(--border-solid); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:11px;" class="mono">Button · 8px</div>
+        <div style="width:120px; height:28px; background:var(--card); border:1px solid var(--border-solid); border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:11px;" class="mono">Badge · 6px</div>
+        <div style="width:120px; height:36px; background:#F8FAFC; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:11px; color:#0a0a0a; font-family:var(--f-mono); font-weight:700;">Plate · 4px</div>
+      </div>
+    </div>
+
+    <div class="ds-section">
+      <span class="ds-label">Shared Atom — License Plate Chip</span>
+      <div class="atom-grid">
+        <span class="plate-chip"><span class="strip"></span><span class="txt">ICT-LEA-1234</span></span>
+        <span class="plate-chip"><span class="strip"></span><span class="txt">PUNJAB-LEB-9981</span></span>
+        <span class="plate-chip"><span class="strip"></span><span class="txt">SINDH-KHI-4471</span></span>
+      </div>
+    </div>
+
+    <div class="ds-section">
+      <span class="ds-label">Shared Atom — Status Badges</span>
+      <div class="atom-grid">
+        <span class="badge compliant"><span class="b-dot"></span>Compliant</span>
+        <span class="badge speeding"><span class="b-dot"></span>Speeding</span>
+        <span class="badge severe"><span class="b-dot"></span>Severe</span>
+        <span class="badge settled"><span class="b-dot"></span>Settled</span>
+      </div>
+    </div>
+
+    <div class="ds-section">
+      <span class="ds-label">Shared Atom — Pulsing Live Dot</span>
+      <div class="atom-grid">
+        <div style="display:flex; align-items:center; gap:8px;"><div class="live-dot"></div><span class="mono" style="font-size:12px;">LIVE · Cam-01</span></div>
+        <div style="display:flex; align-items:center; gap:8px;"><div class="live-dot blue"></div><span class="mono" style="font-size:12px;">SCANNING · Cam-02</span></div>
+      </div>
+    </div>
+
+    <div class="ds-section">
+      <span class="ds-label">Buttons</span>
+      <div class="atom-grid">
+        <button class="btn primary">Primary Action</button>
+        <button class="btn success">Success Action</button>
+        <button class="btn danger">Danger Action</button>
+        <button class="btn">Secondary Action</button>
+      </div>
+    </div>
+  </div></div>
+</div>
+</div>
+
+</div>
+
+<script>
+const apiBase = 'http://localhost:5000/api';
+const refreshIntervals = { toll: 5000, driver: 7000, tech: 9000, occ: 12000 };
+
+const dims = {
+  occ:'1920 × 1080 · DESKTOP', toll:'1024 × 768 · TABLET',
+  driver:'393 × 852 · MOBILE', field:'393 × 852 · MOBILE', ds:'1400 × AUTO · REFERENCE'
+};
+function showRole(id, el){
+  document.querySelectorAll('.role-screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('scr-'+id).classList.add('active');
+  document.querySelectorAll('.meta-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('dimsLabel').textContent = dims[id];
+}
+function driverTab(i, el){
+  document.querySelectorAll('#scr-driver .m-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  for(let n=0;n<3;n++) document.getElementById('dBody'+n).style.display = (n===i)?'block':'none';
+}
+function fieldTab(i, el){
+  document.querySelectorAll('#scr-field .m-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  for(let n=0;n<3;n++) document.getElementById('fBody'+n).style.display = (n===i)?'block':'none';
+}
+function tollState(state){
+  const panel = document.getElementById('statusPanel');
+  const icon = document.getElementById('statusIcon');
+  const headline = document.getElementById('statusHeadline');
+  const amount = document.getElementById('statusAmount');
+  const sub = document.getElementById('statusSub');
+  if(state==='go'){
+    panel.className = 'status-panel go';
+    icon.textContent = '✅';
+    headline.textContent = 'NO PENDING VIOLATION';
+    headline.style.color = 'var(--success)';
+    amount.style.display = 'none';
+    sub.textContent = 'Vehicle clear to proceed · PUNJAB-LEB-9981';
+  } else {
+    panel.className = 'status-panel stop';
+    icon.textContent = '⛔';
+    headline.textContent = 'PENDING E-CHALLAN FOUND';
+    headline.style.color = 'var(--crit)';
+    amount.style.display = 'block';
+    amount.textContent = 'PKR 2,500';
+    sub.textContent = '1 unpaid violation on record · M-2 Kalar Kahar';
+  }
+}
+
+function formatCurrency(value){
+  return `PKR ${Number(value || 0).toLocaleString('en-US')}`;
+}
+
+function setSectionStatus(id,message,isError=false){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.textContent = message;
+  el.style.color = isError ? 'rgba(228,72,63,0.92)' : 'var(--muted)';
+}
+
+function setLoadingState(id,message){ setSectionStatus(id,message,false); }
+function setErrorState(id,message){ setSectionStatus(id,message,true); }
+
+async function fetchJson(url, options={}){
+  const res = await fetch(url, options);
+  if(!res.ok){
+    const err = await res.json().catch(()=>({message:res.statusText}));
+    throw new Error(err.message || `${res.status} ${res.statusText}`);
+  }
+  return res.json();
+}
+
+async function loadLatestTollData(){
+  setLoadingState('tollFetchState','Loading toll capture data…');
+  try {
+    const data = await fetchJson(`${apiBase}/toll/anpr-capture`);
+    document.getElementById('tollPlate').innerText = data.plateNumber;
+    document.getElementById('tollReadPlate').innerText = data.plateNumber;
+    document.getElementById('recordedSpeed').innerText = data.speed || '—';
+    document.getElementById('postedLimit').innerText = `${data.postedLimit || 120} km/h`;
+    const overage = (data.speed || 0) - (data.postedLimit || 120);
+    document.getElementById('overage').innerText = `${overage >= 0 ? '+' : ''}${overage.toFixed(0)} km/h`;
+    document.getElementById('locationLine').innerText = `${data.location} · ${data.cameraId}`;
+    document.getElementById('dateTime').innerText = new Date().toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    const badge = document.getElementById('tollConfidenceBadge');
+    badge.className = `badge ${['pending_challan','speeding','severe'].includes(data.status) ? 'severe' : 'compliant'}`;
+    badge.innerHTML = `<span class="b-dot"></span>Match Confidence ${Number(data.confidence || 0).toFixed(1)}%`;
+
+    const violation = ['pending_challan','speeding','severe'].includes(data.status);
+    const panel = document.getElementById('statusPanel');
+    const icon = document.getElementById('statusIcon');
+    const headline = document.getElementById('statusHeadline');
+    const amount = document.getElementById('statusAmount');
+    const sub = document.getElementById('statusSub');
+
+    panel.className = violation ? 'status-panel stop' : 'status-panel go';
+    icon.textContent = violation ? '⛔' : '✅';
+    headline.textContent = violation ? 'PENDING E-CHALLAN FOUND' : 'NO PENDING VIOLATION';
+    headline.style.color = violation ? 'var(--crit)' : 'var(--success)';
+    amount.style.display = violation ? 'block' : 'none';
+    amount.textContent = violation ? formatCurrency(data.fineAmount || 2500) : '';
+    sub.textContent = violation ? `${data.status.replace('_',' ')} · ${data.location}` : `Vehicle clear to proceed · ${data.plateNumber}`;
+    setSectionStatus('tollFetchState', `Last refreshed ${new Date().toLocaleTimeString()}`);
+  } catch (err) {
+    setErrorState('tollFetchState', `Toll data unavailable: ${err.message}`);
+    console.error(err);
+  }
+}
+
+async function loadOccMetrics(){
+  setLoadingState('occFetchState','Updating control room metrics…');
+  try {
+    const list = await fetchJson(`${apiBase}/toll/list`);
+    const violations = list.filter(r => ['pending_challan','speeding','severe'].includes(r.status)).length;
+    const avgSpeed = list.length ? Math.round(list.reduce((sum,r)=>sum+(r.speed||0),0)/list.length) : 0;
+    const settled = list.filter(r=>r.settled).length;
+    const scanned = list.length * 60;
+    const revenue = list.reduce((sum,r)=>(r.settled? sum + (r.fineAmount||0) : sum), 0);
+    document.getElementById('occScannedCount').innerText = scanned.toLocaleString('en-US');
+    document.getElementById('occViolationCount').innerText = violations.toLocaleString('en-US');
+    document.getElementById('occAvgSpeed').innerText = `${avgSpeed} km/h`;
+    document.getElementById('occSettledCount').innerText = settled.toLocaleString('en-US');
+    document.getElementById('occRevenue').innerText = formatCurrency(revenue);
+    setSectionStatus('occFetchState', `Control room refreshed ${new Date().toLocaleTimeString()}`);
+  } catch (err) {
+    setErrorState('occFetchState', `Metrics unavailable: ${err.message}`);
+    console.error(err);
+  }
+}
+
+async function loadDriverData(){
+  setLoadingState('driverFetchState','Loading driver portal data…');
+  try {
+    const data = await fetchJson(`${apiBase}/driver/evidence`);
+    document.getElementById('driverName').innerText = data.driverName;
+    document.getElementById('driverCnic').innerText = `CNIC ${data.cnic}`;
+    document.getElementById('driverViolationHeadline').innerText = data.latestViolation;
+    document.getElementById('driverDueAmount').innerText = formatCurrency(data.dueAmount);
+    document.getElementById('driverPlate').innerText = data.plateNumber;
+    document.getElementById('driverRegisteredPlate').innerText = data.plateNumber;
+    document.getElementById('driverVehicle').innerText = data.vehicle;
+    const settledCount = Math.max(0, (data.totalChallans || 0) - (data.unpaidChallans || 0));
+    document.getElementById('driverChallans').innerText = `${data.unpaidChallans || 0} unpaid · ${settledCount} settled`;
+    const severityBadge = document.getElementById('driverSeverityBadge');
+    severityBadge.className = data.unpaidChallans ? 'badge severe' : 'badge compliant';
+    severityBadge.innerHTML = `<span class="b-dot"></span>${data.unpaidChallans ? 'Severe' : 'Compliant'}`;
+    document.getElementById('driverDueDate').innerText = `Due ${new Date(Date.now()+14*24*60*60*1000).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}`;
+    document.getElementById('driverCamA').innerText = data.evidence.camA;
+    document.getElementById('driverCamB').innerText = data.evidence.camB;
+    document.getElementById('driverAvgSpeed').innerText = `${data.evidence.averageSpeed} km/h`;
+    document.getElementById('driverPostedLimit').innerText = `${data.evidence.speedLimit} km/h`;
+    document.getElementById('driverTimeElapsed').innerText = `${data.evidence.timeDiffSeconds.toFixed(3)} sec`;
+    document.getElementById('driverDistance').innerText = '2.0 km';
+    const overage = data.evidence.averageSpeed - data.evidence.speedLimit;
+    document.getElementById('driverOverage').innerText = `${overage >= 0 ? '+' : ''}${overage.toFixed(0)} km/h over`;
+    setSectionStatus('driverFetchState', `Driver portal refreshed ${new Date().toLocaleTimeString()}`);
+  } catch (err) {
+    setErrorState('driverFetchState', `Driver data unavailable: ${err.message}`);
+    console.error(err);
+  }
+}
+
+async function loadTechData(){
+  setLoadingState('techFetchState','Loading field tech diagnostics…');
+  try {
+    const data = await fetchJson(`${apiBase}/tech/diagnostics`);
+    document.getElementById('techCameraId').innerText = data.cameraId;
+    const status = data.status.toUpperCase();
+    const stateMap = {
+      ONLINE: {bg:'rgba(53,214,160,0.12)',c:'#35D6A0'},
+      OFFLINE: {bg:'rgba(228,72,63,0.12)',c:'#E4483F'},
+      DEGRADED: {bg:'rgba(240,168,60,0.12)',c:'#F0A83C'},
+      MAINTENANCE: {bg:'rgba(79,143,232,0.12)',c:'#4F8FE8'}
+    };
+    const style = stateMap[status] || stateMap.OFFLINE;
+    const techStatusPill = document.getElementById('techStatusPill');
+    techStatusPill.style.background = style.bg;
+    techStatusPill.style.color = style.c;
+    techStatusPill.style.border = `1px solid ${style.c}55`;
+    techStatusPill.innerText = `● ${status}`;
+    document.getElementById('techPing').innerText = data.ping;
+    document.getElementById('techFps').innerText = `${data.fps} fps`;
+    document.getElementById('techLens').innerText = data.lensStatus;
+    document.getElementById('techLastOnline').innerText = new Date(data.lastOnlineAt).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    document.getElementById('techFirmware').innerText = 'v4.2.1';
+    document.getElementById('techPowerStatus').innerHTML = '<span class="b-dot"></span>Normal';
+    document.getElementById('techNetworkLink').innerHTML = `<span class="b-dot"></span>${data.networkLink}`;
+    document.getElementById('techStorage').innerText = data.storageUsage;
+    setSectionStatus('techFetchState', `Diagnostics refreshed ${new Date().toLocaleTimeString()}`);
+  } catch (err) {
+    setErrorState('techFetchState', `Diagnostics unavailable: ${err.message}`);
+    console.error(err);
+  }
+}
+
+async function createTechIssue(){
+  const cameraValue = document.getElementById('techCameraSelect').value;
+  const issueType = document.getElementById('techIssueTypeSelect').value;
+  const description = document.getElementById('techIssueDescInput').value.trim();
+  if(!description){
+    alert('Please describe the issue before submitting.');
+    return;
+  }
+  try {
+    const payload = {
+      cameraId: cameraValue.split('·')[0].trim(),
+      status: 'MAINTENANCE',
+      fps: 0,
+      pingMs: 0,
+      lensStatus: issueType,
+      networkLink: 'Down',
+      storageUsage: 'N/A',
+      lastOnlineAt: new Date()
+    };
+    const result = await fetchJson(`${apiBase}/tech/record`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    alert('Issue ticket created successfully.');
+    setSectionStatus('techFetchState','Issue submitted and logged.');
+    console.log('Tech issue created:', result);
+    loadTechData();
+  } catch (err) {
+    setErrorState('techFetchState', `Submit failed: ${err.message}`);
+    console.error(err);
+  }
+}
+
+function handleDriverPayment(){
+  const payBtn = document.getElementById('driverPayButton');
+  payBtn.disabled = true;
+  payBtn.innerText = 'Processing…';
+  setTimeout(() => {
+    document.getElementById('driverSeverityBadge').className = 'badge compliant';
+    document.getElementById('driverSeverityBadge').innerHTML = '<span class="b-dot"></span>Paid';
+    document.getElementById('driverDueAmount').innerText = formatCurrency(0);
+    document.getElementById('driverAccountStatus').className = 'badge compliant';
+    document.getElementById('driverAccountStatus').innerHTML = '<span class="b-dot"></span>Paid';
+    document.getElementById('driverDueDate').innerText = 'Paid Today';
+    alert('Payment completed successfully.');
+    payBtn.disabled = false;
+    payBtn.innerText = 'Pay PKR 2,500';
+  }, 800);
+}
+
+function setupButtonActions(){
+  const collectCashBtn = Array.from(document.querySelectorAll('button')).find(b=>b.textContent.includes('Collect Cash'));
+  if(collectCashBtn){
+    collectCashBtn.addEventListener('click', ()=>{
+      tollState('go');
+      alert('Cash collected successfully for this vehicle.');
+    });
+  }
+  const smsBtn = Array.from(document.querySelectorAll('button')).find(b=>b.textContent.includes('Send SMS'));
+  if(smsBtn){
+    smsBtn.addEventListener('click', ()=>alert('SMS payment link dispatched to the vehicle owner.'));
+  }
+  const payBtn = document.getElementById('driverPayButton');
+  if(payBtn){ payBtn.addEventListener('click', handleDriverPayment); }
+  const techSubmitBtn = document.getElementById('techSubmitIssue');
+  if(techSubmitBtn){ techSubmitBtn.addEventListener('click', createTechIssue); }
+}
+
+function startPolling(){
+  loadLatestTollData();
+  loadOccMetrics();
+  loadDriverData();
+  loadTechData();
+  setInterval(loadLatestTollData, refreshIntervals.toll);
+  setInterval(loadOccMetrics, refreshIntervals.occ);
+  setInterval(loadDriverData, refreshIntervals.driver);
+  setInterval(loadTechData, refreshIntervals.tech);
+}
+
+window.addEventListener('DOMContentLoaded', ()=>{
+  setupButtonActions();
+  startPolling();
+  setInterval(()=>{
+    document.getElementById('occClock').textContent = new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) + ' PKT';
+  }, 1000);
+});
+</script>
+</body>
+</html>
